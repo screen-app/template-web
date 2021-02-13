@@ -1,123 +1,95 @@
-import resolve from '@rollup/plugin-node-resolve'
-import replace from '@rollup/plugin-replace'
-import commonjs from '@rollup/plugin-commonjs'
-import svelte from 'rollup-plugin-svelte'
-import babel from '@rollup/plugin-babel'
-import {terser} from 'rollup-plugin-terser'
-import config from 'sapper/config/rollup.js'
-import pkg from './package.json'
-import sveltePreprocess from 'svelte-preprocess'
+import svelte from 'rollup-plugin-svelte-hot';
+import Hmr from 'rollup-plugin-hot'
+import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import livereload from 'rollup-plugin-livereload';
+import { terser } from 'rollup-plugin-terser';
+import { copySync, removeSync } from 'fs-extra'
+import { spassr } from 'spassr'
+import getConfig from '@roxi/routify/lib/utils/config'
+import autoPreprocess from 'svelte-preprocess'
+import { injectManifest } from 'rollup-plugin-workbox'
 
-const mode = process.env.NODE_ENV
-const dev = mode === 'development'
-const legacy = Boolean(process.env.SAPPER_LEGACY_BUILD)
 
-const preprocess = sveltePreprocess({
-  postcss: true
+const { distDir } = getConfig() // use Routify's distDir for SSOT
+const assetsDir = 'assets'
+const buildDir = `dist/build`
+const isNollup = !!process.env.NOLLUP
+const production = !process.env.ROLLUP_WATCH;
+
+// clear previous builds
+removeSync(distDir)
+removeSync(buildDir)
+
+
+const serve = () => ({
+    writeBundle: async () => {
+        const options = {
+            assetsDir: [assetsDir, distDir],
+            entrypoint: `${assetsDir}/__app.html`,
+            script: `${buildDir}/main.js`
+        }
+        spassr({ ...options, port: 5000 })
+        spassr({ ...options, ssr: true, port: 5005, ssrOptions: { inlineDynamicImports: true, dev: true } })
+    }
 })
+const copyToDist = () => ({ writeBundle() { copySync(assetsDir, distDir) } })
 
-const onwarn = (warning, onwarn) =>
-  (warning.code === 'MISSING_EXPORT' && /'preload'/.test(warning.message)) ||
-  (warning.code === 'CIRCULAR_DEPENDENCY' &&
-    /[/\\]@sapper[/\\]/.test(warning.message)) ||
-  onwarn(warning)
 
 export default {
-  client: {
-    input: config.client.input(),
-    output: config.client.output(),
+    preserveEntrySignatures: false,
+    input: [`src/main.js`],
+    output: {
+        sourcemap: true,
+        format: 'esm',
+        dir: buildDir,
+        // for performance, disabling filename hashing in development
+        chunkFileNames:`[name]${production && '-[hash]' || ''}.js`
+    },
     plugins: [
-      replace({
-        'process.browser': true,
-        'process.env.NODE_ENV': JSON.stringify(mode)
-      }),
-      svelte({
-        dev,
-        hydratable: true,
-        emitCss: true,
-        preprocess: [preprocess]
-      }),
-      resolve({
-        browser: true,
-        dedupe: ['svelte']
-      }),
-      commonjs(),
-
-      legacy &&
-        babel({
-          extensions: ['.js', '.mjs', '.html', '.svelte'],
-          babelHelpers: 'runtime',
-          exclude: ['node_modules/@babel/**'],
-          presets: [
-            [
-              '@babel/preset-env',
-              {
-                targets: '> 0.25%, not dead'
-              }
+        svelte({
+            dev: !production, // run-time checks      
+            // Extract component CSS — better performance
+            css: css => css.write(`bundle.css`),
+            hot: isNollup,
+            preprocess: [
+                autoPreprocess({
+                    postcss: require('./postcss.config.js'),
+                    defaults: { style: 'postcss' }
+                })
             ]
-          ],
-          plugins: [
-            '@babel/plugin-syntax-dynamic-import',
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                useESModules: true
-              }
-            ]
-          ]
         }),
 
-      !dev &&
-        terser({
-          module: true
-        })
+        // resolve matching modules from current working directory
+        resolve({
+            browser: true,
+            dedupe: importee => !!importee.match(/svelte(\/|$)/)
+        }),
+        commonjs(),
+
+        production && terser(),
+        !production && !isNollup && serve(),
+        !production && !isNollup && livereload(distDir), // refresh entire window when code is updated
+        !production && isNollup && Hmr({ inMemory: true, public: assetsDir, }), // refresh only updated code
+        {
+            // provide node environment on the client
+            transform: code => ({
+                code: code.replace('process.env.NODE_ENV', `"${process.env.NODE_ENV}"`),
+                map: { mappings: '' }
+            })
+        },
+        injectManifest({
+            globDirectory: assetsDir,
+            globPatterns: ['**/*.{js,css,svg}', '__app.html'],
+            swSrc: `src/sw.js`,
+            swDest: `${distDir}/serviceworker.js`,
+            maximumFileSizeToCacheInBytes: 10000000, // 10 MB,
+            mode: 'production'
+        }),
+        production && copyToDist(),
     ],
-
-    preserveEntrySignatures: false,
-    onwarn
-  },
-
-  server: {
-    input: config.server.input(),
-    output: config.server.output(),
-    plugins: [
-      replace({
-        'process.browser': false,
-        'process.env.NODE_ENV': JSON.stringify(mode)
-      }),
-      svelte({
-        generate: 'ssr',
-        hydratable: true,
-        dev,
-        preprocess: [preprocess]
-      }),
-      resolve({
-        dedupe: ['svelte']
-      }),
-      commonjs()
-    ],
-    external: Object.keys(pkg.dependencies).concat(
-      require('module').builtinModules
-    ),
-
-    preserveEntrySignatures: 'strict',
-    onwarn
-  },
-
-  serviceworker: {
-    input: config.serviceworker.input(),
-    output: config.serviceworker.output(),
-    plugins: [
-      resolve(),
-      replace({
-        'process.browser': true,
-        'process.env.NODE_ENV': JSON.stringify(mode)
-      }),
-      commonjs(),
-      !dev && terser()
-    ],
-
-    preserveEntrySignatures: false,
-    onwarn
-  }
+    watch: {
+        clearScreen: false,
+        buildDelay: 100,
+    }
 }

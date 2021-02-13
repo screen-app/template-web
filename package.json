@@ -1,43 +1,51 @@
 {
-  "name": "screen-app-www",
-  "description": "Screen.me Production Release",
-  "license": "UNLICENSED",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "dev": "sapper dev",
-    "build": "sapper build --legacy",
-    "export": "sapper export --legacy",
-    "start": "node __sapper__/build"
+  "name": "svelte-app",
+  "version": "1.0.0",
+  "@comments scripts": {
+    "dev": "develop with blazing fast rebuilds",
+    "build": "build single page application (SPA)",
+    "serve": "serve content in 'dist' folder"
   },
-  "dependencies": {
-    "compression": "^1.7.1",
-    "polka": "next",
-    "sirv": "^1.0.0"
+  "scripts": {
+    "dev": "run-p routify nollup",
+    "build": "routify -b && rollup -c",
+    "serve": "spassr",
+    "nollup": "nollup -c",
+    "routify": "routify"
   },
   "devDependencies": {
-    "@babel/core": "^7.0.0",
-    "@babel/plugin-syntax-dynamic-import": "^7.0.0",
-    "@babel/plugin-transform-runtime": "^7.0.0",
-    "@babel/preset-env": "^7.0.0",
-    "@babel/runtime": "^7.0.0",
-    "@rollup/plugin-babel": "^5.0.0",
-    "@rollup/plugin-commonjs": "^14.0.0",
-    "@rollup/plugin-node-resolve": "^8.0.0",
-    "@rollup/plugin-replace": "^2.2.0",
-    "autoprefixer": "^9.8.6",
+    "@rollup/plugin-commonjs": "^15.0.0",
+    "@rollup/plugin-node-resolve": "^10.0.0",
+    "@roxi/routify": "^2.12.4",
+    "autoprefixer": "^10.2.4",
+    "cross-env": "^7.0.2",
     "cssnano": "^4.1.10",
-    "postcss": "^7.0.32",
-    "postcss-import": "^12.0.1",
-    "postcss-load-config": "^2.1.0",
-    "postcss-nested": "^4.2.3",
-    "postcss-preset-env": "^6.7.0",
-    "rollup": "^2.3.4",
-    "rollup-plugin-svelte": "^6.0.0",
-    "rollup-plugin-terser": "^7.0.0",
-    "sapper": "^0.28.0",
-    "svelte": "^3.17.3",
-    "svelte-preprocess": "^4.2.1",
-    "tailwindcss": "^1.8.6"
+    "fs-extra": "^9.0.1",
+    "nollup": "^0.13.13",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.2.6",
+    "postcss-import": "^13.0.0",
+    "rollup": "^2.33.1",
+    "rollup-plugin-hot": "^0.1.1",
+    "rollup-plugin-livereload": "^2.0.0",
+    "rollup-plugin-svelte": "^6.1.0",
+    "rollup-plugin-svelte-hot": "^0.11.1",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-workbox": "^5.2.1",
+    "spank": "^1.5.1",
+    "spassr": "^2.2.0",
+    "svelte": "^3.29.4",
+    "svelte-preprocess": "^4.6.8",
+    "tailwindcss": "^2.0.3",
+    "tossr": "^1.3.1"
+  },
+  "routify": {
+    "extensions": "svelte,html,svx,md"
+  },
+  "spassr": {},
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }
